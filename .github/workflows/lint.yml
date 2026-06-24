@@ -1,0 +1,97 @@
+name: Lint
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        type: string
+        default: '8.4'
+      node-version:
+        type: string
+        default: '22'
+      install-node:
+        description: Skip the npm install + node-tool steps entirely (set false for repos without a JS toolchain).
+        type: boolean
+        default: true
+      install-composer:
+        description: Skip composer install + PHP-tool steps entirely (set false for repos without composer deps).
+        type: boolean
+        default: true
+      run-phpstan:
+        type: boolean
+        default: true
+      phpstan-config:
+        type: string
+        default: phpstan.neon
+      phpstan-memory:
+        type: string
+        default: 2G
+      run-pint:
+        type: boolean
+        default: true
+      run-prettier:
+        type: boolean
+        default: true
+      prettier-path:
+        type: string
+        default: '.'
+      run-eslint:
+        type: boolean
+        default: true
+      eslint-command:
+        type: string
+        default: 'npm run lint'
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        if: ${{ inputs.install-composer }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+
+      - name: Setup Node
+        if: ${{ inputs.install-node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        if: ${{ inputs.install-node }}
+        run: npm ci
+
+      - name: Install Composer Dependencies
+        if: ${{ inputs.install-composer }}
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+      - name: Run PHPStan
+        if: ${{ inputs.install-composer && inputs.run-phpstan }}
+        env:
+          PHPSTAN_MEMORY: ${{ inputs.phpstan-memory }}
+          PHPSTAN_CONFIG: ${{ inputs.phpstan-config }}
+        run: ./vendor/bin/phpstan analyse --memory-limit="$PHPSTAN_MEMORY" --configuration="$PHPSTAN_CONFIG"
+
+      - name: Run Laravel Pint (check mode)
+        if: ${{ inputs.install-composer && inputs.run-pint }}
+        run: ./vendor/bin/pint --test
+
+      - name: Run Prettier (check mode)
+        if: ${{ inputs.install-node && inputs.run-prettier }}
+        env:
+          PRETTIER_PATH: ${{ inputs.prettier-path }}
+        run: npx prettier --check "$PRETTIER_PATH"
+
+      # `eslint-command` is intentionally an executable command supplied by the
+      # caller (e.g. `npm run lint`), so it is run verbatim by design. Only set
+      # it from trusted repo/org variables.
+      - name: Run ESLint / frontend linter
+        if: ${{ inputs.install-node && inputs.run-eslint }}
+        run: ${{ inputs.eslint-command }}

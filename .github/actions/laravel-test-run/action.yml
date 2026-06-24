@@ -1,0 +1,74 @@
+name: Laravel Test Run
+description: Checkout, install dependencies, and run the Laravel test suite against a given DB connection.
+
+inputs:
+  install-node:
+    description: Install npm deps and run frontend steps.
+    default: 'true'
+  build-assets:
+    description: Run `npm run build` before tests (requires install-node).
+    default: 'true'
+  copy-env-example:
+    description: Copy .env.example -> .env before booting Laravel.
+    default: 'true'
+  generate-app-key:
+    description: Run `php artisan key:generate` after copying env.
+    default: 'true'
+  test-command:
+    description: Command used to run the test suite.
+    default: 'php artisan test'
+  db-connection:
+    description: Laravel DB_CONNECTION (mysql, pgsql, sqlite, ...).
+    required: true
+  db-host:
+    description: Hostname for the DB service (e.g. mysql, pgsql). Empty for sqlite.
+    default: ''
+  db-port:
+    description: Port for the DB service. Empty for sqlite.
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install Node Dependencies
+      if: ${{ inputs.install-node == 'true' }}
+      shell: bash
+      run: npm ci
+
+    - name: Install Composer Dependencies
+      shell: bash
+      run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+    - name: Copy Environment File
+      if: ${{ inputs.copy-env-example == 'true' }}
+      shell: bash
+      run: cp .env.example .env
+
+    - name: Generate Application Key
+      if: ${{ inputs.generate-app-key == 'true' }}
+      shell: bash
+      run: php artisan key:generate
+
+    - name: Build Assets
+      if: ${{ inputs.install-node == 'true' && inputs.build-assets == 'true' }}
+      shell: bash
+      run: npm run build
+
+    # `test-command` is intentionally an executable command supplied by the
+    # caller (e.g. `php artisan test --parallel`), so it is run verbatim by
+    # design. Only set it from trusted repo/org variables.
+    - name: Tests
+      shell: bash
+      run: ${{ inputs.test-command }}
+      env:
+        DB_CONNECTION: ${{ inputs.db-connection }}
+        DB_HOST: ${{ inputs.db-host }}
+        DB_PORT: ${{ inputs.db-port }}
+        DB_DATABASE: testing
+        DB_USERNAME: root
+        DB_PASSWORD: test
+        REDIS_HOST: redis
+        REDIS_PORT: 6379

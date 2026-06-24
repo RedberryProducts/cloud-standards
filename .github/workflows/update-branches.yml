@@ -1,0 +1,84 @@
+name: Create or Update Technical Branches
+
+on:
+  workflow_call:
+    inputs:
+      base-commit:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+    secrets:
+      REDBERRY_AUTOMATIONS_API_KEY:
+        required: true
+      REDBERRY_AUTOMATIONS_API_BASE:
+        description: Base URL of the Redberry Automations API (e.g. https://example.tld). Provided by the consuming repo/org; never hardcoded here.
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  BRANCH: deployments/${{ inputs.target }}
+  TARGET_SHA: ${{ inputs['base-commit'] }}
+
+jobs:
+  ensure-and-protect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate target
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            development|staging|prerelease|production) echo "Target OK";;
+            *) echo "Invalid target: '$TARGET'. Allowed: development|staging|prerelease|production" >&2; exit 1;;
+          esac
+
+      - name: Mint installation access token via Redberry Automations
+        id: app-token
+        env:
+          REDBERRY_AUTOMATIONS_API_KEY: ${{ secrets.REDBERRY_AUTOMATIONS_API_KEY }}
+          API_BASE: ${{ secrets.REDBERRY_AUTOMATIONS_API_BASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ]; then
+            echo "REDBERRY_AUTOMATIONS_API_BASE secret is not set. Add it at the repo or org level (Settings → Secrets and variables → Actions → Secrets)." >&2
+            exit 1
+          fi
+          response=$(curl -sS -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer ${REDBERRY_AUTOMATIONS_API_KEY}" \
+            -H "Accept: application/json" \
+            "${API_BASE}/api/v1/github/installation-access-token")
+          http_code=$(printf '%s' "$response" | tail -n1)
+          body=$(printf '%s' "$response" | sed '$d')
+          if [ "$http_code" != "200" ]; then
+            echo "Failed to mint installation access token (HTTP $http_code)" >&2
+            echo "$body" >&2
+            exit 1
+          fi
+          token=$(printf '%s' "$body" | jq -r '.token')
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "Response did not contain a token" >&2
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure branch exists at target SHA
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          repo="$REPO"
+          ref="heads/${BRANCH}"
+          sha="${TARGET_SHA}"
+
+          if gh api -X GET "repos/$repo/git/ref/${ref}" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$repo/git/refs/${ref}" -f sha="$sha" -F force=true
+          else
+            gh api -X POST "repos/$repo/git/refs" -f ref="refs/${ref}" -f sha="$sha"
+          fi

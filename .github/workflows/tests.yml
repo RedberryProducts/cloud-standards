@@ -1,0 +1,109 @@
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      runner-image:
+        description: Container image used to run the test job (must include PHP + extensions).
+        type: string
+        default: kirschbaumdevelopment/laravel-test-runner:8.4
+      database:
+        description: "Which database(s) to run tests against: 'mysql', 'pgsql', or 'both'."
+        type: string
+        default: 'mysql'
+      install-node:
+        type: boolean
+        default: true
+      build-assets:
+        type: boolean
+        default: true
+      copy-env-example:
+        type: boolean
+        default: true
+      generate-app-key:
+        type: boolean
+        default: true
+      test-command:
+        type: string
+        default: 'php artisan test'
+
+permissions:
+  contents: read
+
+jobs:
+  test-mysql:
+    if: ${{ inputs.database == 'mysql' || inputs.database == 'both' }}
+    runs-on: ubuntu-latest
+
+    container:
+      image: ${{ inputs.runner-image }}
+      options: --init
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: testing
+          MYSQL_ROOT_PASSWORD: test
+        options: >-
+          --health-cmd "mysqladmin -u root -p$MYSQL_ROOT_PASSWORD status"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 3306:3306
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: RedberryProducts/cloud-standards/.github/actions/laravel-test-run@v1
+        with:
+          install-node: ${{ inputs.install-node }}
+          build-assets: ${{ inputs.build-assets }}
+          copy-env-example: ${{ inputs.copy-env-example }}
+          generate-app-key: ${{ inputs.generate-app-key }}
+          test-command: ${{ inputs.test-command }}
+          db-connection: mysql
+          db-host: mysql
+          db-port: '3306'
+
+  test-pgsql:
+    if: ${{ inputs.database == 'pgsql' || inputs.database == 'both' }}
+    runs-on: ubuntu-latest
+
+    container:
+      image: ${{ inputs.runner-image }}
+      options: --init
+
+    services:
+      pgsql:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testing
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd "pg_isready -U root -d testing"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: RedberryProducts/cloud-standards/.github/actions/laravel-test-run@v1
+        with:
+          install-node: ${{ inputs.install-node }}
+          build-assets: ${{ inputs.build-assets }}
+          copy-env-example: ${{ inputs.copy-env-example }}
+          generate-app-key: ${{ inputs.generate-app-key }}
+          test-command: ${{ inputs.test-command }}
+          db-connection: pgsql
+          db-host: pgsql
+          db-port: '5432'
