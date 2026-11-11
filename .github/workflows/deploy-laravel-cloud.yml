@@ -58,13 +58,6 @@ jobs:
     outputs:
       gh_env: ${{ steps.gh_env.outputs.gh_env }}
     steps:
-      - name: Check received secrets
-        env:
-          HAS_API_KEY: ${{ secrets.REDBERRY_AUTOMATIONS_API_KEY != '' }}
-          HAS_API_BASE: ${{ secrets.REDBERRY_AUTOMATIONS_API_BASE != '' }}
-        run: |
-          echo "API key received: $HAS_API_KEY"
-          echo "API base received: $HAS_API_BASE"
       - name: Debug event context
         run: |
           echo "Event: $GITHUB_EVENT_NAME"
@@ -143,8 +136,12 @@ jobs:
 
   update-branches:
     needs: [set-commit-sha, set-gh-env, run-tests]
-    if: always()
-    uses: RedberryProducts/cloud-standards/.github/workflows/update-branches.yml@wip
+    if: |
+      always()
+      && inputs.enable-deployment-branches
+      && needs.set-gh-env.outputs.gh_env != 'None'
+      && (needs.run-tests.result == 'success' || needs.run-tests.result == 'skipped')
+    uses: RedberryProducts/cloud-standards/.github/workflows/update-branches.yml@v1
     with:
       base-commit: ${{ needs.set-commit-sha.outputs.commit_sha }}
       target: ${{ needs.set-gh-env.outputs.gh_env }}

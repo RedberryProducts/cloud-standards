@@ -24,19 +24,7 @@ env:
   TARGET_SHA: ${{ inputs['base-commit'] }}
 
 jobs:
-  check-secrets:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check received secrets
-        env:
-          HAS_API_KEY: ${{ secrets.REDBERRY_AUTOMATIONS_API_KEY != '' }}
-          HAS_API_BASE: ${{ secrets.REDBERRY_AUTOMATIONS_API_BASE != '' }}
-        run: |
-          echo "API key received: $HAS_API_KEY"
-          echo "API base received: $HAS_API_BASE"
-
   ensure-and-protect:
-    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Validate target
