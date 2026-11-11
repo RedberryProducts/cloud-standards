@@ -3,10 +3,6 @@ name: Create or Update Technical Branches
 on:
   workflow_call:
     inputs:
-      check-secrets-only:
-        description: Check secret presence without creating tokens or updating branches.
-        type: boolean
-        default: false
       base-commit:
         required: true
         type: string
@@ -29,7 +25,6 @@ env:
 
 jobs:
   check-secrets:
-    if: ${{ inputs.check-secrets-only }}
     runs-on: ubuntu-latest
     steps:
       - name: Check received secrets
@@ -41,7 +36,7 @@ jobs:
           echo "API base received: $HAS_API_BASE"
 
   ensure-and-protect:
-    if: ${{ !inputs.check-secrets-only }}
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Validate target

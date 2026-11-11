@@ -11,10 +11,6 @@ name: Deploy to Laravel Cloud
 on:
   workflow_call:
     inputs:
-      check-secrets-only:
-        description: Check secret presence in both workflows without creating tokens or updating branches.
-        type: boolean
-        default: false
       run-tests:
         type: boolean
         default: true
@@ -136,7 +132,7 @@ jobs:
 
   run-tests:
     needs: set-commit-sha
-    if: ${{ inputs.run-tests && !inputs.check-secrets-only }}
+    if: ${{ inputs.run-tests }}
     uses: RedberryProducts/cloud-standards/.github/workflows/tests.yml@v1
     with:
       runner-image: ${{ inputs.tests-runner-image }}
@@ -147,19 +143,9 @@ jobs:
 
   update-branches:
     needs: [set-commit-sha, set-gh-env, run-tests]
-    if: |
-      always()
-      && (
-        inputs.check-secrets-only
-        || (
-          inputs.enable-deployment-branches
-          && needs.set-gh-env.outputs.gh_env != 'None'
-          && (needs.run-tests.result == 'success' || needs.run-tests.result == 'skipped')
-        )
-      )
+    if: always()
     uses: RedberryProducts/cloud-standards/.github/workflows/update-branches.yml@wip
     with:
-      check-secrets-only: ${{ inputs.check-secrets-only }}
       base-commit: ${{ needs.set-commit-sha.outputs.commit_sha }}
       target: ${{ needs.set-gh-env.outputs.gh_env }}
     secrets: inherit
