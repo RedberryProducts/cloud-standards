@@ -145,4 +145,6 @@ jobs:
     with:
       base-commit: ${{ needs.set-commit-sha.outputs.commit_sha }}
       target: ${{ needs.set-gh-env.outputs.gh_env }}
-    secrets: inherit
+    secrets:
+      REDBERRY_AUTOMATIONS_API_KEY: ${{ secrets.REDBERRY_AUTOMATIONS_API_KEY }}
+      REDBERRY_AUTOMATIONS_API_BASE: ${{ secrets.REDBERRY_AUTOMATIONS_API_BASE }}
