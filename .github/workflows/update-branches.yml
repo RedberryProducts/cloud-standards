@@ -15,10 +15,10 @@ on:
         type: string
     secrets:
       REDBERRY_AUTOMATIONS_API_KEY:
-        required: true
+        required: false
       REDBERRY_AUTOMATIONS_API_BASE:
         description: Base URL of the Redberry Automations API (e.g. https://example.tld). Provided by the consuming repo/org; never hardcoded here.
-        required: true
+        required: false
 
 permissions:
   contents: read
