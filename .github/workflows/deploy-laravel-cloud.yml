@@ -58,6 +58,13 @@ jobs:
     outputs:
       gh_env: ${{ steps.gh_env.outputs.gh_env }}
     steps:
+      - name: Check received secrets
+        env:
+          HAS_API_KEY: ${{ secrets.REDBERRY_AUTOMATIONS_API_KEY != '' }}
+          HAS_API_BASE: ${{ secrets.REDBERRY_AUTOMATIONS_API_BASE != '' }}
+        run: |
+          echo "API key received: $HAS_API_KEY"
+          echo "API base received: $HAS_API_BASE"
       - name: Debug event context
         run: |
           echo "Event: $GITHUB_EVENT_NAME"
